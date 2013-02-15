@@ -35,7 +35,7 @@ module Tire
       end
 
       should "have to_indexed_json method doing the same as to_json" do
-        [{}, { 1 => 2 }, { 3 => 4, 5 => 6 }, { nil => [7,8,9] }].each do |h|
+        [{}, { :foo => 2 }, { :foo => 4, :bar => 6 }, { :foo => [7,8,9] }].each do |h|
           assert_equal MultiJson.decode(h.to_json), MultiJson.decode(h.to_indexed_json)
         end
       end
@@ -53,6 +53,12 @@ module Tire
         assert_equal '["one","two"]', ['one','two'].to_json
       end
 
+    end
+
+    context "Ruby Test::Unit" do
+      should "actually return true from assert..." do
+        assert_equal true, assert(true)
+      end
     end
 
   end

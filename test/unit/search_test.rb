@@ -17,6 +17,14 @@ module Tire
         assert_match %r|/index1,index2/_search|, s.url
       end
 
+      should "be initialized with multiple indices with options" do
+        indices = {'index1' => {:boost => 1},'index2' => {:boost => 2}}
+        s = Search::Search.new(indices) { query { string 'foo' } }
+        assert_match /index1/, s.url
+        assert_match /index2/, s.url
+        assert_equal({'index1' => 1, 'index2' => 2}, s.to_hash[:indices_boost])
+      end
+
       should "be initialized with multiple indices as string" do
         s = Search::Search.new(['index1,index2,index3']) { query { string 'foo' } }
         assert_match %r|/index1,index2,index3/_search|, s.url
@@ -109,9 +117,8 @@ module Tire
         s = Search::Search.new('index') do
           query { string 'title:foo' }
         end
-        assert_equal %q|curl -X GET "http://localhost:9200/index/_search?pretty=true" -d | +
-                     %q|'{"query":{"query_string":{"query":"title:foo"}}}'|,
-                     s.to_curl
+        assert_match %r|curl \-X GET 'http://localhost:9200/index/_search\?pretty' -d |, s.to_curl
+        assert_match %r|\s*{\s*"query"\s*:\s*"title:foo"\s*}\s*|, s.to_curl
       end
 
       should "return curl snippet with multiple indices for debugging" do
@@ -137,7 +144,8 @@ module Tire
                                       sort { by :title, 'desc' }.
                                       size(5).
                                       sort { by :name, 'asc' }.
-                                      from(1)
+                                      from(1).
+                                      version(true)
         end
       end
 
@@ -149,6 +157,7 @@ module Tire
         s = Search::Search.new('index')
         assert_not_nil s.results
         assert_not_nil s.response
+        assert_not_nil s.json
       end
 
       should "allow the search criteria to be chained" do
@@ -221,6 +230,15 @@ module Tire
           end
           hash = MultiJson.decode( s.to_json )
           assert_equal [{'title' => 'desc'}, '_score'], hash['sort']
+        end
+
+        should "allow to track scores" do
+          s = Search::Search.new('index') do
+            sort { by :title }
+            track_scores true
+          end
+
+          assert_equal 'true', s.to_hash[:track_scores].to_json
         end
 
       end
@@ -315,7 +333,7 @@ module Tire
 
       context "with version" do
 
-        should "set the version value in options" do
+        should "set the version" do
           s = Search::Search.new('index') do
             version true
           end
@@ -385,6 +403,30 @@ module Tire
 
       end
 
+      context "with min_score" do
+        should "allow to specify minimum score for returned documents" do
+          s = Search::Search.new('index') do
+            query { string 'foo' }
+            min_score 0.5
+          end
+
+          assert_equal( '0.5', s.to_hash[:min_score].to_json )
+        end
+      end
+
+      context "with partial fields" do
+
+        should "add partial_fields config" do
+          s = Search::Search.new('index') do
+            partial_field 'name', :include => 'name_*'
+          end
+
+          hash = MultiJson.decode( s.to_json )
+          assert_equal({'name' => { 'include' => 'name_*'} }, hash['partial_fields'])
+        end
+
+      end
+
       context "explain" do
 
         should "default to false" do
@@ -448,7 +490,66 @@ module Tire
 
       end
 
+      context "boosting queries" do
+
+        should "wrap other queries" do
+         s = Search::Search.new('index') do
+            query do
+              boosting do
+                positive { string 'foo' }
+                positive { term('bar', 'baz') }
+                negative { term('bar', 'moo') }
+              end
+            end
+          end
+
+          hash  = MultiJson.decode(s.to_json)
+          query = hash['query']['boosting']
+
+          assert_equal 2, query['positive'].size
+          assert_equal 1, query['negative'].size
+
+          assert_equal( { 'query_string' => { 'query' => 'foo' } }, query['positive'].first)
+          assert_equal( { 'term' => { 'bar' => {'term' => 'moo' } } }, query['negative'].first)
+        end
+
+      end
+
     end
+
+    context "script field" do
+
+      should "allow to specify script field" do
+        s = Search::Search.new('index') do
+          script_field :test1, :script => "doc['my_field_name'].value * 2"
+        end
+
+        assert_equal 1, s.script_fields.size
+
+        assert_not_nil s.script_fields
+        assert_not_nil s.script_fields[:test1]
+
+        assert_equal( {:test1 => { :script => "doc['my_field_name'].value * 2" }}.to_json,
+                     s.to_hash[:script_fields].to_json )
+      end
+
+      should "allow to add multiple script fields" do
+        s = Search::Search.new('index') do
+          script_field :field1, :script => "doc['my_field_name'].value * 2"
+          script_field :field2, :script => "doc['other_field_name'].value * 3"
+        end
+
+        assert_equal 2, s.script_fields.size
+
+        assert_not_nil  s.script_fields[:field1]
+        assert_not_nil  s.script_fields[:field2]
+
+        assert_equal( { :field1 => { :script => "doc['my_field_name'].value * 2" }, :field2 => { :script => "doc['other_field_name'].value * 3" } }.to_json,
+                     s.to_hash[:script_fields].to_json )
+      end
+
+    end
+
 
   end
 

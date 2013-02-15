@@ -1,22 +1,18 @@
 module Tire
-  VERSION   = "0.4.2"
+  VERSION   = "0.5.4"
 
   CHANGELOG =<<-END
     IMPORTANT CHANGES LATELY:
 
-    Version 0.4.1
-    -------------
-    * Added a Index#settings method to retrieve index settings as a Hash
-    * Added support for the "scan" search in the Ruby API
-    * Added support for reindexing the index documents into new index
-    * Added basic support for index aliases
-    * Changed, that Index#bulk_store runs against an index endpoint, not against `/_bulk`
-    * Refactorings, fixes, Ruby 1.8 compatibility
-
-    Version 0.4.2
-    -------------
-    * Fixed incorrect handling of PUT requests in the Curb client
-    * Fixed, that blocks passed to `Tire::Index.new` or `Tire.index` losed the scope
-    * Added `Tire::Alias`, interface and DSL to manage aliases as resources
+    * Added the support for the Count API
+    * Escape single quotes in `to_curl` serialization
+    * Added JRuby compatibility
+    * Added proper `as_json` support for `Results::Collection` and `Results::Item` classes
+    * Added extracting the `routing` information in the `Index#store` method
+    * Refactored the `update_index` method for search and persistence integration
+    * Cast collection properties in Model::Persistence as empty Array by default
+    * Allow passing `:index` option to `MyModel.import`
+    * Update to Mocha ~> 0.13
+    * Update to MultiJson ~> 1.3
   END
 end

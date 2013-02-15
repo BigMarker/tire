@@ -24,16 +24,16 @@ module Tire
           setup do
             Model::Search.index_prefix 'prefix'
           end
-          
+
           teardown do
             Model::Search.index_prefix nil
           end
-          
+
           should "have configured prefix in index_name" do
             assert_equal 'prefix_persistent_articles', PersistentArticle.index_name
             assert_equal 'prefix_persistent_articles', PersistentArticle.new(:title => 'Test').index_name
           end
-          
+
         end
 
         should "have document_type" do
@@ -125,8 +125,13 @@ module Tire
           assert_equal ids.size, documents.count
         end
 
-        should "find all documents" do
-          Configuration.client.stubs(:get).returns(mock_response(@find_all.to_json))
+        should "find all documents with correct type" do
+          Configuration.client.expects(:get).
+                               with do |url,payload|
+                                 assert_equal "#{Configuration.url}/persistent_articles/persistent_article/_search", url
+                               end.
+                               times(3).
+                               returns(mock_response(@find_all.to_json))
           documents = PersistentArticle.all
 
           assert_equal 3, documents.count
@@ -134,8 +139,12 @@ module Tire
           assert_equal PersistentArticle.find(:all).map { |e| e.id }, PersistentArticle.all.map { |e| e.id }
         end
 
-        should "find first document" do
-          Configuration.client.expects(:get).returns(mock_response(@find_first.to_json))
+        should "find first document with correct type" do
+          Configuration.client.expects(:get).
+                               with do |url,payload|
+                                 assert_equal "#{Configuration.url}/persistent_articles/persistent_article/_search?size=1", url
+                               end.
+                               returns(mock_response(@find_first.to_json))
           document = PersistentArticle.first
 
           assert_equal 'First', document.attributes['title']
@@ -199,6 +208,11 @@ module Tire
             article = PersistentArticleWithDefaults.new :title => 'Test'
             assert_equal [],    article.tags
             assert_equal false, article.hidden
+          end
+
+          should "evaluate lambdas as default values" do
+            article = PersistentArticleWithDefaults.new
+            assert_equal Time.now.year, article.created_at.year
           end
 
           should "not affect default value" do
@@ -305,6 +319,23 @@ module Tire
             assert_equal 'A', article.stats.meta.tags
           end
 
+          should "create empty collection for missing value" do
+            article = PersistentArticleWithCastedCollection.new :title => 'Test'
+            assert_respond_to article.comments, :each
+            assert article.comments.empty?, "article.comments should be empty: " + article.inspect
+          end
+
+        end
+
+        context "when initializing" do
+
+          should "be a new record" do
+            article = PersistentArticle.new :title => 'Test'
+
+            assert   article.new_record?, "#{article.inspect} should be `new_record?`"
+            assert ! article.persisted?,  "#{article.inspect} should NOT be `persisted?`"
+          end
+
         end
 
         context "when creating" do
@@ -318,10 +349,11 @@ module Tire
                                   doc['tags']  == ['one', 'two']
                                   doc['published_on'] == nil
                                 end.
-                                returns(mock_response('{"ok":true,"_id":"abc123"}'))
+                                returns(mock_response('{"ok":true,"_id":"abc123","_version":1}'))
             article = PersistentArticle.create :title => 'Test', :tags => [:one, :two]
 
-            assert article.persisted?, "#{article.inspect} should be `persisted?`"
+            assert   article.persisted?,  "#{article.inspect} should be `persisted?`"
+            assert ! article.new_record?, "#{article.inspect} should NOT be `new_record?`"
             assert_equal 'abc123', article.id
           end
 

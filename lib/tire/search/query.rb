@@ -2,13 +2,19 @@ module Tire
   module Search
 
     class Query
+      attr_accessor :value
+
       def initialize(&block)
         @value = {}
         block.arity < 1 ? self.instance_eval(&block) : block.call(self) if block_given?
       end
 
       def term(field, value, options={})
-        query = { field => { :term => value }.update(options) }
+        query = if value.is_a?(Hash)
+          { field => value.to_hash }
+        else
+          { field => { :term => value }.update(options) }
+        end
         @value = { :term => query }
       end
 
@@ -23,6 +29,7 @@ module Tire
       end
 
       def text(field, value, options={})
+        Tire.warn "The 'text' query has been deprecated, please use a 'match' query."
         query_options = { :query => value }.update(options)
         @value = { :text => { field => query_options } }
         @value
@@ -32,6 +39,14 @@ module Tire
         @value = { :query_string => { :query => value } }
         @value[:query_string].update(options)
         @value
+      end
+
+      def prefix(field, value, options={})
+        if options[:boost]
+          @value = { :prefix => { field => { :prefix => value, :boost => options[:boost] } } }
+        else
+          @value = { :prefix => { field => value } }
+        end
       end
 
       def custom_score(options={}, &block)
@@ -60,8 +75,22 @@ module Tire
         @value
       end
 
-      def all
-        @value = { :match_all => {} }
+      def dis_max(options={}, &block)
+        @dis_max ||= DisMaxQuery.new(options)
+        block.arity < 1 ? @dis_max.instance_eval(&block) : block.call(@dis_max) if block_given?
+        @value[:dis_max] = @dis_max.to_hash
+        @value
+      end
+
+      def nested(options={}, &block)
+        @nested = NestedQuery.new(options)
+        block.arity < 1 ? @nested.instance_eval(&block) : block.call(@nested) if block_given?
+        @value[:nested] = @nested.to_hash
+        @value
+      end
+
+      def all(options = {})
+        @value = { :match_all => options }
         @value
       end
 
@@ -69,11 +98,18 @@ module Tire
         @value = { :ids => { :values => values, :type => type }  }
       end
 
+      def boosting(options={}, &block)
+        @boosting ||= BoostingQuery.new(options)
+        block.arity < 1 ? @boosting.instance_eval(&block) : block.call(@boosting) if block_given?
+        @value[:boosting] = @boosting.to_hash
+        @value
+      end
+
       def to_hash
         @value
       end
 
-      def to_json
+      def to_json(options={})
         to_hash.to_json
       end
 
@@ -119,7 +155,6 @@ module Tire
       end
     end
 
-
     class FilteredQuery
       def initialize(&block)
         @value = {}
@@ -142,8 +177,72 @@ module Tire
         @value
       end
 
+      def to_json(options={})
+        to_hash.to_json
+      end
+    end
+
+    class DisMaxQuery
+      def initialize(options={}, &block)
+        @options = options
+        @value   = {}
+        block.arity < 1 ? self.instance_eval(&block) : block.call(self) if block_given?
+      end
+
+      def query(&block)
+        (@value[:queries] ||= []) << Query.new(&block).to_hash
+        @value
+      end
+
+      def to_hash
+        @value.update(@options)
+      end
+
+      def to_json(options={})
+        to_hash.to_json
+      end
+    end
+
+    class NestedQuery
+      def initialize(options={}, &block)
+        @options = options
+        @value = {}
+        block.arity < 1 ? self.instance_eval(&block) : block.call(self) if block_given?
+      end
+
+      def query(&block)
+        @value[:query] = Query.new(&block).to_hash
+        @value
+      end
+
+      def to_hash
+        @value.update(@options)
+      end
+
       def to_json
         to_hash.to_json
+      end
+    end
+
+    class BoostingQuery
+      def initialize(options={}, &block)
+        @options = options
+        @value   = {}
+        block.arity < 1 ? self.instance_eval(&block) : block.call(self) if block_given?
+      end
+
+      def positive(&block)
+        (@value[:positive] ||= []) << Query.new(&block).to_hash
+        @value
+      end
+
+      def negative(&block)
+        (@value[:negative] ||= []) << Query.new(&block).to_hash
+        @value
+      end
+
+      def to_hash
+        @value.update(@options)
       end
     end
 

@@ -19,7 +19,7 @@ module Tire
           #      property :tags,      :analyzer => 'keywords', :default => []
           #    end
           #
-          # You can pass mapping definition for ElasticSearch in the options Hash.
+          # You can pass mapping definition for Elasticsearch in the options Hash.
           #
           # You can define default property values.
           #
@@ -46,11 +46,16 @@ module Tire
 
             # Save property default value (when relevant):
             unless (default_value = options.delete(:default)).nil?
-              property_defaults[name.to_sym] = default_value
+              property_defaults[name.to_sym] = default_value.respond_to?(:call) ? default_value.call : default_value
             end
 
             # Save property casting (when relevant):
             property_types[name.to_sym] = options[:class] if options[:class]
+
+            # Define default value for colletions:
+            if options[:class].is_a?(Array)
+              property_defaults[name.to_sym] ||= []
+            end
 
             # Store mapping for the property:
             mapping[name] = options

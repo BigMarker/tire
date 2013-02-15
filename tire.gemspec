@@ -6,7 +6,7 @@ Gem::Specification.new do |s|
   s.name        = "tire"
   s.version     = Tire::VERSION
   s.platform    = Gem::Platform::RUBY
-  s.summary       = "Ruby client for ElasticSearch"
+  s.summary       = "Ruby client for Elasticsearch"
   s.homepage      = "http://github.com/karmi/tire"
   s.authors       = [ 'Karel Minarik' ]
   s.email         = 'karmi@karmi.cz'
@@ -35,29 +35,28 @@ Gem::Specification.new do |s|
 
   # = Development dependencies
   #
-  s.add_development_dependency "bundler",     "~> 1.0"
-  s.add_development_dependency "yajl-ruby",   "~> 1.0"
+  s.add_development_dependency "bundler",      "~> 1.0"
   s.add_development_dependency "shoulda"
-  s.add_development_dependency "mocha"
+  s.add_development_dependency "mocha",        "~> 0.13"
+  s.add_development_dependency "minitest",     "~> 2.12"
   s.add_development_dependency "activerecord", ">= 3.0"
-  s.add_development_dependency "sqlite3"
   s.add_development_dependency "mongoid",      "~> 2.2"
-  s.add_development_dependency "bson_ext"
   s.add_development_dependency "redis-persistence"
-  s.add_development_dependency "curb"
-  s.add_development_dependency "minitest"
+  s.add_development_dependency "faraday"
 
-  # These gems are not needed for CI at <http://travis-ci.org/#!/karmi/tire>
-  #
-  unless ENV["CI"]
-    s.add_development_dependency "rdoc"
-    s.add_development_dependency "turn", "~> 0.9" if defined?(RUBY_VERSION) && RUBY_VERSION > '1.9'
+  unless defined?(JRUBY_VERSION)
+    s.add_development_dependency "yajl-ruby",   "~> 1.0"
+    s.add_development_dependency "sqlite3"
+    s.add_development_dependency "bson_ext"
+    s.add_development_dependency "curb"
+    s.add_development_dependency "oj"
+    s.add_development_dependency "turn",        "~> 0.9"
   end
 
   s.description = <<-DESC
-   Tire is a Ruby client for the ElasticSearch search engine/database.
+   Tire is a Ruby client for the Elasticsearch search engine/database.
 
-   It provides Ruby-like API for fluent communication with the ElasticSearch server
+   It provides Ruby-like API for fluent communication with the Elasticsearch server
    and blends with ActiveModel class for convenient usage in Rails applications.
 
    It allows to delete and create indices, define mapping for them, supports
